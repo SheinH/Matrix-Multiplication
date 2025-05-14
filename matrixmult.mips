@@ -1,0 +1,138 @@
+.data
+matrixAFile:    .asciiz "/Users/meow/Downloads/matrixA.bin"
+matrixBFile:    .asciiz "/Users/meow/Downloads/matrixB.bin"
+
+bufferSize:     .word   1024
+matrixSize:     .word   16
+startTimeLow: .word 0
+startTimeHigh: .word 0
+endTimeLow:   .word 0
+endTimeHigh:  .word 0
+bufferA:        .space  1024
+bufferB:        .space  1024
+bufferC:        .space  1024
+
+.text
+                .globl  main
+
+
+
+main:
+    # load bufferSize into $t2
+    lw      $t2,            bufferSize
+    lw      $t3,            matrixSize
+
+    # --- Read matrix A ---
+    la      $a0,            matrixAFile                     # filename
+    la      $a1,            bufferA                         # buffer pointer
+    move    $a2,            $t2                             # size
+    jal     read_file
+    move    $s0,            $v0                             # bytes read from A
+
+    # --- Read matrix B ---
+    la      $a0,            matrixBFile
+    la      $a1,            bufferB
+    move    $a2,            $t2
+    jal     read_file
+    move    $s1,            $v0                             # bytes read from B
+
+    li      $s0,            0
+    li      $s1,            0
+    li $v0, 30          # Syscall code for system time
+    syscall
+    sw $a0, startTimeLow # Store lower 32 bits of start time
+    sw $a1, startTimeHigh # Store higher 32 bits of start time
+    jal     matrix_mult
+    li $v0, 30          # Syscall code for system time
+    syscall
+    sw $a0, endTimeLow   # Store lower 32 bits of end time
+    sw $a1, endTimeHigh  # Store higher 32 bits of end time
+    lw $t0, startTimeLow
+    lw $t1, endTimeLow
+    sub $t0, $t1, $t0   # duration = endTimeLow - startTimeLow
+    # exit
+    li      $v0,            10
+    syscall
+
+
+read_file:
+    move    $t2,            $a1                             # t2 ← buffer
+    move    $t3,            $a2                             # t3 ← size
+
+    # open(filename, O_RDONLY, 0)
+    li      $a1,            0                               # flags = O_RDONLY
+    li      $a2,            0                               # mode = 0 (unused for read)
+    li      $v0,            13                              # syscall 13 = open
+    syscall
+    move    $t0,            $v0                             # t0 ← file descriptor
+
+    # read(fd, buffer, size)
+    move    $a0,            $t0                             # fd
+    move    $a1,            $t2                             # buffer
+    move    $a2,            $t3                             # size
+    li      $v0,            14                              # syscall 14 = read
+    syscall
+    move    $t1,            $v0                             # t1 ← bytes read
+
+    # close(fd)
+    move    $a0,            $t0
+    li      $v0,            16                              # syscall 16 = close
+    syscall
+
+    # return bytes read
+    move    $v0,            $t1
+    jr      $ra
+
+    #s0 = i
+    #s1 = j
+    #s2 = k
+    #s3 = matrix A ptr
+    #s4 = matrix B ptr
+    #s5 = matrix C ptr
+    #s6 = sum
+    #s7 = rowSize
+matrix_mult:
+    addi $sp, $sp, -4       # Make space on stack
+    sw   $ra, 0($sp)
+    lw $s7, matrixSize #s7 = matrix size
+    sll $t9, $s7, 2 #t9 = row size in bytes
+    la $s5, bufferC
+    move $s0, $zero
+i_condition:
+    beq  $s0, $s7, exit #exit if i = matrix size
+    move $s1, $zero #j = 0
+j_condition:
+    beq $s1, $s7, i_increment #break if j = matrix size
+inner_loop_setup:
+    mul $t0, $s0, $t9
+    la $s3, bufferA($t0) #bufferAPtr = bufferA[rowsize * i]
+    mul $t0, $s1, 4
+    la $s4, bufferB($t0) #bufferBptr = bufferB[j]
+    
+    move $s6, $zero
+    move $s2, $zero
+k_condition:
+    beq $s2, $s7, j_increment
+inner_loop:
+    lw $t0, ($s3)
+    lw $t1, ($s4)
+    mul $t2, $t0, $t1 #multiply matrix a * matrix b
+    add $s6, $s6, $t2 # add to running sum
+    addi $s2, $s2, 1 #k += 1
+    addi $s3, $s3, 4
+    add $s4, $s4, $t9
+    j k_condition
+i_increment:
+    addi $s0, $s0, 1
+    j i_condition
+j_increment:
+    sw $s6, ($s5)
+    addi $s5, $s5, 4
+    addi $s1, $s1, 1
+    j j_condition
+
+
+exit:
+    lw   $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr   $ra 
