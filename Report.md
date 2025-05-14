@@ -428,6 +428,8 @@ After spawning all threads, I simply join each of them and then my matrix will b
 | 1024               |              | 3.746641      | 0.872080           | 0.685130 | 0.115436       | 4.2962            | 5.4685        | 32.4564            |
 | 2048               |              | 60.1373       | 25.8772            | 22.4906  | 2.0150         | 2.3240            | 2.6739        | 29.8454            |
 | 4096               |              |               |                    | 216.5711 | 76.6781        |                   |               |                    |
+
+
 ![Comparison of Matrix Multiplication Methods](https://raw.githubusercontent.com/SheinH/Matrix-Multiplication/refs/heads/main/performance_chart.png)
 
 From this data, a few things stand out:
