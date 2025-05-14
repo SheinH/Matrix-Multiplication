@@ -410,3 +410,36 @@ Here, inside of function `matrix_multiply_simd_threaded`, I used `sysconf(_SC_NP
 I then divided the rows of the matrices and gave each thread a portion of the computation. Because the results of one row do not affect the next, there was no inter-thread synchronization needed.
 
 After spawning all threads, I simply join each of them and then my matrix will be computed. This led to a 30x increase over the unoptimized version.
+
+## Performance Data & Analysis
+
+| Square Matrix Size | MIPS (int32) | Unoptimized C | Compiler Optimized | SIMD     | SIMD + Threads | Compiler Increase | SIMD Increase | Threading Increase |
+| ------------------ | ------------ | ------------- | ------------------ | -------- | -------------- | ----------------- | ------------- | ------------------ |
+| 1                  | 0            | 0.000000      | 0.000000           | 0.000000 | 0.000017       | 1.1825            | 1.1717        | 0.0018             |
+| 2                  | 1            | 0.000000      | 0.000000           | 0.000000 | 0.000033       | 1.7253            | 1.6808        | 0.0013             |
+| 4                  | 6            | 0.000000      | 0.000000           | 0.000000 | 0.000046       | 6.4945            | 4.6842        | 0.0051             |
+| 8                  | 38           | 0.000002      | 0.000000           | 0.000000 | 0.000104       | 9.9204            | 12.8704       | 0.0163             |
+| 16                 | 303          | 0.000014      | 0.000001           | 0.000001 | 0.000125       | 13.3314           | 20.0990       | 0.1116             |
+| 32                 | 1854         | 0.000114      | 0.000007           | 0.000005 | 0.000119       | 15.7041           | 23.3563       | 0.9555             |
+| 64                 | 13824        | 0.000819      | 0.000074           | 0.000045 | 0.000125       | 11.0722           | 18.0742       | 6.5794             |
+| 128                | 109788       | 0.006889      | 0.000753           | 0.000589 | 0.000210       | 9.1534            | 11.7017       | 32.8473            |
+| 256                |              | 0.056966      | 0.010521           | 0.005098 | 0.001073       | 5.4144            | 11.1733       | 53.1122            |
+| 512                |              | 0.459662      | 0.084347           | 0.084100 | 0.014942       | 5.4496            | 5.4657        | 30.7626            |
+| 1024               |              | 3.746641      | 0.872080           | 0.685130 | 0.115436       | 4.2962            | 5.4685        | 32.4564            |
+| 2048               |              | 60.1373       | 25.8772            | 22.4906  | 2.0150         | 2.3240            | 2.6739        | 29.8454            |
+| 4096               |              |               |                    | 216.5711 | 76.6781        |                   |               |                    |
+![Comparison of Matrix Multiplication Methods](https://raw.githubusercontent.com/SheinH/Matrix-Multiplication/refs/heads/main/performance_chart.png)
+
+From this data, a few things stand out:
+
+* Hand written SIMD beats out compiler auto-vectorization, though this may be due to using fp16
+* SIMD has less of an edge as matrix size increases: this may be due to thermal constraints on the CPU however
+* Threading is actually slower than just SIMD for small matrices. It only becomes better once we are dealing with 64x64 matrices or larger.
+
+### Takeaways
+
+1. Handwritten SIMD can still offer a performance edge compared to compiler-generated auto-vectorized code.
+2. Threading can offer massive performance increases, but...
+3. Every thread spawned has a performance overhead. Threading should only be employed when data sizes are large enough to warrant them.
+4. In comparison, SIMD is faster than non SIMD code almost always.
+5. Using half-precision floating points can be advantageous since we can fit more individual data points into a SIMD register. If I used single precision floating points, I would be able to perform only half as many calculations per instruction.
